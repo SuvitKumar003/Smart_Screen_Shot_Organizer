@@ -1,0 +1,9 @@
+logs/
+models/
+trained_model*
+plots/
+*.csv
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+*.pyo
