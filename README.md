@@ -1,3 +1,8 @@
+# SSO Project
+
+> ⚠️ Note: This repository was originally named **Credit-Card--Fraud-Detection-AutoEncoder** by mistake.  
+> The contents have been replaced with my **SSO Project**.
+
 📸 Smart Screenshot Organizer (SSSO)
 
 A Machine Learning-powered screenshot management system that automatically classifies, organizes, and makes screenshots searchable. Instead of manually scrolling through hundreds of images, SSSO enables smart search, auto-tagging, and context-aware organization of screenshots.
