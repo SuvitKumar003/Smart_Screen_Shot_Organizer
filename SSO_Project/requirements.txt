@@ -1,0 +1,22 @@
+fastapi
+uvicorn[standard]
+starlette
+pydantic
+python-multipart
+pillow
+pytesseract
+opencv-python
+spacy
+sentence-transformers
+scikit-learn
+umap-learn
+faiss-cpu
+sqlalchemy
+aiofiles
+requests
+streamlit
+python-dotenv
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+whisper   # optional, only if you want local Whisper
