@@ -1,94 +1,68 @@
-# SSO Project
+# 📸 SnapSort - AI Screenshot Organizer
 
-> ⚠️ Note: This repository was originally named **Credit-Card--Fraud-Detection-AutoEncoder** by mistake.  
-> The contents have been replaced with my **SSO Project**.
+An intelligent screenshot organizer that uses OCR and semi-supervised clustering to automatically categorize your screenshots.
 
-📸 Smart Screenshot Organizer (SSSO)
+## 🚀 Features (In Progress)
 
-A Machine Learning-powered screenshot management system that automatically classifies, organizes, and makes screenshots searchable. Instead of manually scrolling through hundreds of images, SSSO enables smart search, auto-tagging, and context-aware organization of screenshots.
+- ✅ Upload multiple screenshots
+- ✅ Define custom tags/categories
+- 🔄 OCR text extraction (Coming in Step 2)
+- 🔄 AI-powered clustering (Coming in Step 3)
+- 🔄 Auto-create new categories (Coming in Step 3)
+- 🔄 Download organized files (Coming in Step 4)
 
-🌟 Features
+## 📦 Installation
 
-✅ Automatic Classification – Detects the type of screenshot (e.g., LinkedIn post, job opening, bill, chat, etc.)
-✅ Metadata Extraction – Captures key text (company name, job role, numbers, etc.) using OCR
-✅ Searchable Screenshots – Quickly find images using keywords (e.g., “Google internship”, “Invoice”)
-✅ Organized Storage – Screenshots are automatically grouped into folders by category
-✅ Extensible ML Pipeline – Easily add more categories and improve classification over time
+1. Clone the repository
+2. Create folders:
+```bash
+mkdir uploads organized
+```
 
-🧠 Tech Stack
-
-Frontend: React.js
-
-Backend: Flask / FastAPI
-
-Machine Learning:
-
-CNN / Transfer Learning for screenshot classification
-
-OCR (Tesseract / EasyOCR) for extracting text
-
-NLP for keyword tagging
-
-
-⚙️ Installation
-
-Clone the repo
-
-git clone https://github.com/SuvitKumar003/Smart_ScreenShot_Organizer.git
-cd Smart_ScreenShot_Organizer
-
-
-Backend Setup
-
-cd backend
+3. Install dependencies:
+```bash
 pip install -r requirements.txt
-python app.py
+```
 
+## ▶️ Run the App
 
-Frontend Setup
+```bash
+streamlit run app.py
+```
 
-cd frontend
-npm install
-npm start
+The app will open in your browser at `http://localhost:8501`
 
+## 🏗️ Project Structure
 
-Access App
-Open: http://localhost:3000
+```
+screenshot-organizer/
+├── app.py                 # Main Streamlit application
+├── requirements.txt       # Python dependencies
+├── uploads/              # Temporary storage for uploads
+├── organized/            # Output organized folders
+└── utils/                # Utility functions (coming soon)
+```
 
-📂 Project Structure
-Smart_ScreenShot_Organizer/
-│── backend/              # Flask backend + ML models
-│   ├── models/           # Trained ML models
-│   ├── app.py            # API endpoints
-│   └── utils/            # OCR + preprocessing
-│
-│── frontend/             # React frontend
-│   ├── src/              # Components + UI
-│   └── public/
-│
-│── dataset/              # Training dataset (sample screenshots)
-│── README.md             # Project documentation
+## 📝 Progress
 
-🚀 Future Improvements
+**Step 1: Basic UI** ✅ (15% Complete)
+- Streamlit interface
+- File upload
+- Tag definition
+- Image preview
 
-🔍 Visual Search → Search by uploading a sample image
+**Step 2: OCR Integration** 🔄 (Next)
+**Step 3: Clustering Logic** 🔄
+**Step 4: Organization & Export** 🔄
+**Step 5: Deployment** 🔄
 
-🤖 FAANG-level ML → Better models with transformers for text + image
+## 👨‍💻 Tech Stack
 
-☁️ Cloud Integration → Auto-sync with Google Drive / Dropbox
+- **Frontend**: Streamlit
+- **OCR**: EasyOCR (Coming)
+- **ML**: sentence-transformers (Coming)
+- **Language**: Python 3.8+
 
-📊 Analytics Dashboard → See screenshot usage trends
+---
 
-📜 License
-
-This project is licensed under the MIT License.
-
-👨‍💻 Author
-
-Suvit Kumar
-LinkedIn
- | GitHub
-
-Database: SQLite / MongoDB (to store metadata & searchable tags)
-
-Deployment: Docker + GitHub Actions (future scope: cloud hosting on AWS/GCP)
+Built with ❤️ for solving real-world problems
