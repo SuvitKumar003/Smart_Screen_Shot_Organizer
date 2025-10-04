@@ -1,8 +1,7 @@
 import streamlit as st
 from PIL import Image
-import os
 from utils.ocr_helper import OCRProcessor
-from utils.clustering import ClusteringEngine
+from utils.smart_clustering import EnhancedClusteringEngine
 
 # Page config
 st.set_page_config(
@@ -18,7 +17,7 @@ if 'ocr_processor' not in st.session_state:
 
 if 'clustering_engine' not in st.session_state:
     with st.spinner("🔄 Loading AI models..."):
-        st.session_state.clustering_engine = ClusteringEngine()
+        st.session_state.clustering_engine = EnhancedClusteringEngine()
 
 if 'extracted_data' not in st.session_state:
     st.session_state.extracted_data = {}
@@ -28,6 +27,7 @@ if 'organized_results' not in st.session_state:
 
 # Title
 st.title("📸 SnapSort - AI Screenshot Organizer")
+st.markdown("**✨ Enhanced with Smart Clustering**")
 st.markdown("---")
 
 # Sidebar for user inputs
@@ -42,12 +42,16 @@ with st.sidebar:
     
     user_tags = []
     for i in range(num_tags):
-        tag = st.text_input(f"Tag {i+1}", key=f"tag_{i}", placeholder=f"e.g., code, receipts, memes")
+        tag = st.text_input(
+            f"Tag {i+1}", 
+            key=f"tag_{i}", 
+            placeholder=f"e.g., LinkedIn recruiter, code, receipts"
+        )
         if tag:
             user_tags.append(tag)
     
     st.markdown("---")
-    st.info("💡 Images that don't fit will be auto-clustered!")
+    st.info("💡 Images that don't fit will be auto-clustered smartly!")
     
     # Advanced settings
     with st.expander("⚙️ Advanced Settings"):
@@ -102,7 +106,7 @@ if uploaded_files and user_tags:
     col_btn1, col_btn2 = st.columns(2)
     
     with col_btn1:
-        if st.button("🔍 Step 1: Extract Text", type="primary", use_container_width=False):
+        if st.button("🔍 Step 1: Extract Text", type="primary", use_container_width=True):
             with st.spinner("🔍 Extracting text using OCR..."):
                 
                 # Clear previous results
@@ -136,8 +140,8 @@ if uploaded_files and user_tags:
                 st.success("✅ Ready for Step 2!")
     
     with col_btn2:
-        if st.session_state.extracted_data and st.button("🤖 Step 2: AI Organize", type="secondary", use_container_width=False):
-            with st.spinner("🤖 Using AI to organize screenshots..."):
+        if st.session_state.extracted_data and st.button("🤖 Step 2: AI Organize", type="secondary", use_container_width=True):
+            with st.spinner("🤖 Using enhanced AI to organize screenshots..."):
                 
                 # Organize using clustering engine
                 results = st.session_state.clustering_engine.organize_screenshots(
@@ -181,9 +185,20 @@ if st.session_state.extracted_data and not st.session_state.organized_results:
 # Display organized results
 if st.session_state.organized_results:
     st.markdown("---")
-    st.subheader("🎯 AI Organization Results")
+    st.subheader("🎯 Enhanced AI Organization Results")
     
     results = st.session_state.organized_results
+    
+    # Statistics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        total_matched = sum(len(files) for files in results['matched'].values())
+        st.metric("✅ Matched to Tags", total_matched)
+    with col2:
+        total_clustered = sum(len(files) for files in results['clustered'].values())
+        st.metric("🔮 Auto-Clustered", total_clustered)
+    with col3:
+        st.metric("📊 Total Processed", len(st.session_state.extracted_data))
     
     # Display matched tags
     st.markdown("### 🏷️ Matched to Your Tags")
@@ -198,12 +213,17 @@ if st.session_state.organized_results:
                         data['file'].seek(0)
                         image = Image.open(data['file'])
                         st.image(image, caption=filename, width=200)
+                        
                         score = results['scores'][filename]
-                        st.caption(f"Match: {score:.2%}")
+                        screenshot_type = results.get('types', {}).get(filename, 'unknown')
+                        
+                        st.caption(f"📊 Match Score: {score:.2%}")
+                        st.caption(f"🔖 Detected Type: {screenshot_type}")
     
     # Display auto-clustered
     if results['clustered']:
-        st.markdown("### 🔮 Auto-Discovered Clusters")
+        st.markdown("### 🔮 Smart Auto-Clustering")
+        st.caption("✨ Intelligently grouped by content type and similarity")
         
         for cluster_name, filenames in results['clustered'].items():
             with st.expander(f"📦 {cluster_name} ({len(filenames)} images)", expanded=True):
@@ -214,5 +234,28 @@ if st.session_state.organized_results:
                         data['file'].seek(0)
                         image = Image.open(data['file'])
                         st.image(image, caption=filename, width=200)
+                        
+                        screenshot_type = results.get('types', {}).get(filename, 'unknown')
+                        st.caption(f"🔖 Type: {screenshot_type}")
     
-    st.success("🎉 Organization complete! Next step: Download organized files")
+    st.success("🎉 Organization complete!")
+    
+    # Show what's improved
+    with st.expander("✨ What's New in Enhanced Version?"):
+        st.markdown("""
+        **🎯 Smarter Clustering:**
+        - Automatically detects screenshot types (LinkedIn, code, receipts, etc.)
+        - Keyword extraction for better matching
+        - Focuses only on relevant text portions
+        - Multi-factor similarity scoring
+        
+        **📊 Better Results:**
+        - More accurate tag matching
+        - Intelligent grouping of unmatched screenshots
+        - Shows detected screenshot types
+        - Improved match scores
+        """)
+
+# Footer
+st.markdown("---")
+st.caption("Made with ❤️ using Streamlit, EasyOCR & AI • Enhanced Clustering Active ✨")
