@@ -1,277 +1,244 @@
+# utils/smart_clustering.py
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import re
-from collections import Counter
+from collections import defaultdict
 
 class EnhancedClusteringEngine:
     def __init__(self):
-        """Initialize with better models for screenshot clustering"""
+        """Initialize with sentence transformer for semantic similarity"""
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.similarity_threshold = 0.35
-        
-        # Keywords for different screenshot types
-        self.screenshot_patterns = {
-            'social_media': ['linkedin', 'twitter', 'facebook', 'instagram', 'profile', 'post', 'message'],
-            'recruitment': ['recruiter', 'job', 'opportunity', 'position', 'hiring', 'interview', 'application'],
-            'code': ['github', 'code', 'function', 'class', 'def', 'import', 'console', 'terminal'],
-            'receipts': ['receipt', 'invoice', 'payment', 'total', 'paid', 'amount', 'order', 'transaction'],
-            'memes': ['meme', 'funny', 'lol', 'joke'],
-            'emails': ['from:', 'to:', 'subject:', 'dear', 'regards', 'inbox', 'sent'],
-            'meetings': ['zoom', 'meet', 'teams', 'meeting', 'calendar', 'schedule'],
-            'design': ['figma', 'design', 'prototype', 'mockup', 'ui', 'ux']
-        }
+        self.similarity_threshold = 0.45
     
     def extract_keywords(self, text):
         """Extract important keywords from text"""
-        if not text or text == "[No text detected]":
+        if not text or "[No text detected]" in text:
             return []
         
-        # Convert to lowercase
         text_lower = text.lower()
-        
-        # Remove special characters but keep spaces
+        # Remove special characters
         text_clean = re.sub(r'[^\w\s]', ' ', text_lower)
-        
-        # Split into words
         words = text_clean.split()
         
         # Remove common stopwords
-        stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were'}
-        keywords = [w for w in words if w not in stopwords and len(w) > 2]
+        stopwords = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 
+            'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were',
+            'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+            'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can'
+        }
         
+        keywords = [w for w in words if w not in stopwords and len(w) > 2]
         return keywords
     
-    def detect_screenshot_type(self, text):
-        """
-        Detect what type of screenshot this is based on keywords
-        Returns: (type, confidence)
-        """
-        if not text or text == "[No text detected]":
-            return None, 0.0
-        
-        text_lower = text.lower()
-        scores = {}
-        
-        for screenshot_type, patterns in self.screenshot_patterns.items():
-            score = 0
-            for pattern in patterns:
-                if pattern in text_lower:
-                    score += 1
-            
-            if score > 0:
-                # Normalize by number of patterns
-                scores[screenshot_type] = score / len(patterns)
-        
-        if scores:
-            best_type = max(scores, key=scores.get)
-            return best_type, scores[best_type]
-        
-        return None, 0.0
-    
-    def focused_text_extraction(self, text, target_keywords):
-        """
-        Extract only relevant portions of text that match target keywords
-        This helps in better clustering for specific tags like "LinkedIn recruiter"
-        """
-        if not text or text == "[No text detected]":
-            return ""
-        
-        sentences = text.split('.')
-        relevant_sentences = []
-        
-        for sentence in sentences:
-            sentence_lower = sentence.lower()
-            # Check if any target keyword is in this sentence
-            for keyword in target_keywords:
-                if keyword.lower() in sentence_lower:
-                    relevant_sentences.append(sentence.strip())
-                    break
-        
-        return '. '.join(relevant_sentences) if relevant_sentences else text
-    
-    def enhanced_similarity(self, text1, text2, tag=None):
-        """
-        Enhanced similarity calculation with keyword matching
-        """
-        # Get embeddings
-        emb1 = self.generate_embedding(text1)
-        emb2 = self.generate_embedding(text2)
-        
-        # Cosine similarity
-        semantic_sim = self.calculate_similarity(emb1, emb2)
-        
-        # Keyword overlap bonus
-        keywords1 = set(self.extract_keywords(text1))
-        keywords2 = set(self.extract_keywords(text2))
-        
-        if keywords1 and keywords2:
-            keyword_overlap = len(keywords1.intersection(keywords2)) / len(keywords1.union(keywords2))
-        else:
-            keyword_overlap = 0
-        
-        # If tag provided, check for tag keywords in text
-        tag_boost = 0
-        if tag:
-            tag_keywords = self.extract_keywords(tag)
-            text_keywords = self.extract_keywords(text1)
-            
-            for tk in tag_keywords:
-                if tk in text_keywords:
-                    tag_boost += 0.1
-            
-            tag_boost = min(tag_boost, 0.3)  # Cap the boost
-        
-        # Weighted combination
-        final_score = (semantic_sim * 0.6) + (keyword_overlap * 0.3) + tag_boost
-        
-        return min(final_score, 1.0)
-    
     def generate_embedding(self, text):
-        """Generate embedding for text"""
-        if not text or text == "[No text detected]":
+        """Generate semantic embedding for text"""
+        if not text or "[No text detected]" in text:
             return np.zeros(384)
-        return self.model.encode(text)
+        try:
+            return self.model.encode(text, convert_to_numpy=True)
+        except:
+            return np.zeros(384)
     
     def calculate_similarity(self, embedding1, embedding2):
-        """Calculate cosine similarity"""
+        """Calculate cosine similarity between two embeddings"""
         emb1 = embedding1.reshape(1, -1)
         emb2 = embedding2.reshape(1, -1)
         return float(cosine_similarity(emb1, emb2)[0][0])
     
+    def keyword_overlap_score(self, keywords1, keywords2):
+        """Calculate keyword overlap between two keyword sets"""
+        if not keywords1 or not keywords2:
+            return 0.0
+        
+        set1 = set(keywords1)
+        set2 = set(keywords2)
+        
+        intersection = len(set1.intersection(set2))
+        union = len(set1.union(set2))
+        
+        return intersection / union if union > 0 else 0.0
+    
+    def tag_specificity_match(self, text, tag):
+        """
+        Check for specific tag matches in text.
+        More specific tags should have higher priority.
+        Example: "Google Recruiter" should match before "Recruiter"
+        """
+        text_lower = text.lower()
+        tag_lower = tag.lower()
+        
+        # Check if tag (or parts of it) are directly in text
+        tag_words = tag_lower.split()
+        
+        # Full tag match
+        if tag_lower in text_lower:
+            return 1.0
+        
+        # Check how many tag words are in text
+        match_count = sum(1 for word in tag_words if word in text_lower)
+        
+        if match_count > 0:
+            return match_count / len(tag_words)
+        
+        return 0.0
+    
     def match_to_tags(self, image_text, user_tags):
         """
-        Enhanced matching with focused text extraction
+        Match screenshot text to user-defined tags with intelligent scoring.
+        Priority: Specificity > Semantic Similarity > Keyword Overlap
         """
-        if not image_text or image_text == "[No text detected]":
+        if not image_text or "[No text detected]" in image_text:
             return None, 0.0
         
         best_match = None
         best_score = 0.0
         
+        # Get embeddings
+        text_embedding = self.generate_embedding(image_text)
+        text_keywords = self.extract_keywords(image_text)
+        
         for tag in user_tags:
-            # Extract keywords from tag
+            # 1. SPECIFICITY CHECK - Direct tag mention in text (highest priority)
+            specificity_score = self.tag_specificity_match(image_text, tag)
+            
+            # 2. SEMANTIC SIMILARITY - Using embeddings
+            tag_embedding = self.generate_embedding(tag)
+            semantic_score = self.calculate_similarity(text_embedding, tag_embedding)
+            
+            # 3. KEYWORD OVERLAP - Matching important words
             tag_keywords = self.extract_keywords(tag)
+            keyword_score = self.keyword_overlap_score(text_keywords, tag_keywords)
             
-            # Focus on relevant text portions
-            focused_text = self.focused_text_extraction(image_text, tag_keywords)
+            # Weighted combination with priority
+            # Specificity has highest weight (0.6)
+            # Semantic similarity (0.25)
+            # Keyword overlap (0.15)
+            if specificity_score > 0:
+                final_score = (specificity_score * 0.6) + (semantic_score * 0.25) + (keyword_score * 0.15)
+            else:
+                final_score = (semantic_score * 0.5) + (keyword_score * 0.5)
             
-            # Calculate enhanced similarity
-            similarity = self.enhanced_similarity(
-                focused_text if focused_text else image_text,
-                tag,
-                tag
-            )
-            
-            if similarity > best_score:
-                best_score = similarity
+            if final_score > best_score:
+                best_score = final_score
                 best_match = tag
         
+        # Apply threshold
         if best_score >= self.similarity_threshold:
             return best_match, best_score
         else:
             return None, best_score
     
-    def smart_cluster_unmatched(self, unmatched_images):
+    def smart_cluster_unmatched(self, unmatched_data):
         """
-        Intelligent clustering based on screenshot types and content
+        Intelligently cluster unmatched screenshots based on semantic similarity.
+        Groups similar content together automatically.
         """
-        if not unmatched_images:
+        if not unmatched_data:
             return {}
         
-        # First, detect types
-        typed_images = {}
-        for filename, text in unmatched_images.items():
-            screenshot_type, confidence = self.detect_screenshot_type(text)
-            if screenshot_type and confidence > 0.2:
-                if screenshot_type not in typed_images:
-                    typed_images[screenshot_type] = []
-                typed_images[screenshot_type].append(filename)
+        filenames = list(unmatched_data.keys())
+        texts = list(unmatched_data.values())
         
-        # Group by detected types
+        if len(filenames) == 1:
+            return {filenames[0]: "Uncategorized"}
+        
+        # Generate embeddings for all unmatched images
+        embeddings = []
+        valid_indices = []
+        
+        for idx, text in enumerate(texts):
+            if text and "[No text detected]" not in text:
+                embedding = self.generate_embedding(text)
+                embeddings.append(embedding)
+                valid_indices.append(idx)
+        
         clusters = {}
-        for screenshot_type, filenames in typed_images.items():
-            cluster_name = screenshot_type.replace('_', ' ').title()
-            for fn in filenames:
-                clusters[fn] = cluster_name
         
-        # For remaining untyped images, use similarity clustering
-        untyped = {fn: text for fn, text in unmatched_images.items() if fn not in clusters}
+        # For images without text, put in "Uncategorized"
+        for idx, filename in enumerate(filenames):
+            if idx not in valid_indices:
+                clusters[filename] = "Uncategorized"
         
-        if untyped:
-            embeddings = []
-            filenames = []
+        # Cluster images with text using hierarchical approach
+        if embeddings:
+            embeddings_array = np.array(embeddings)
+            assigned = set()
+            cluster_counter = 1
             
-            for filename, text in untyped.items():
-                if text and text != "[No text detected]":
-                    embeddings.append(self.generate_embedding(text))
-                    filenames.append(filename)
-            
-            if embeddings:
-                embeddings_array = np.array(embeddings)
-                cluster_counter = 1
+            for i in range(len(valid_indices)):
+                if i in assigned:
+                    continue
                 
-                for i, filename in enumerate(filenames):
-                    if filename in clusters:
+                idx_i = valid_indices[i]
+                filename_i = filenames[idx_i]
+                cluster_name = f"Group {cluster_counter}"
+                
+                clusters[filename_i] = cluster_name
+                assigned.add(i)
+                
+                # Find similar images for this cluster
+                for j in range(i + 1, len(valid_indices)):
+                    if j in assigned:
                         continue
                     
-                    cluster_name = f"Group_{cluster_counter}"
-                    clusters[filename] = cluster_name
+                    similarity = self.calculate_similarity(
+                        embeddings_array[i],
+                        embeddings_array[j]
+                    )
                     
-                    for j in range(i + 1, len(filenames)):
-                        if filenames[j] in clusters:
-                            continue
-                        
-                        similarity = self.calculate_similarity(
-                            embeddings_array[i],
-                            embeddings_array[j]
-                        )
-                        
-                        if similarity >= self.similarity_threshold:
-                            clusters[filenames[j]] = cluster_name
-                    
-                    cluster_counter += 1
-        
-        # Handle images with no text
-        for filename in unmatched_images.keys():
-            if filename not in clusters:
-                clusters[filename] = "Uncategorized"
+                    if similarity >= self.similarity_threshold:
+                        idx_j = valid_indices[j]
+                        filename_j = filenames[idx_j]
+                        clusters[filename_j] = cluster_name
+                        assigned.add(j)
+                
+                cluster_counter += 1
         
         return clusters
     
     def organize_screenshots(self, extracted_data, user_tags):
         """
-        Enhanced organization with better matching
+        Main organization function:
+        1. First, match screenshots to user-defined tags
+        2. For unmatched ones, auto-cluster them intelligently
+        
+        Args:
+            extracted_data: Dict of {filename: {'text': str, 'file': file_obj}}
+            user_tags: List of user-defined category tags
+        
+        Returns:
+            dict: Results with matched and clustered screenshots
         """
         results = {
             'matched': {tag: [] for tag in user_tags},
             'clustered': {},
             'scores': {},
-            'types': {}  # Store detected types
+            'unmatched_count': 0
         }
         
-        unmatched = {}
+        unmatched_data = {}
         
-        # Match to user tags
+        # Step 1: Match each screenshot to tags
         for filename, data in extracted_data.items():
             text = data['text']
             
-            # Detect screenshot type
-            screenshot_type, type_confidence = self.detect_screenshot_type(text)
-            results['types'][filename] = screenshot_type or "unknown"
-            
-            # Match to tags
+            # Try to match to a user-defined tag
             best_tag, score = self.match_to_tags(text, user_tags)
             results['scores'][filename] = score
             
             if best_tag:
+                # Matched! Add to that tag's list
                 results['matched'][best_tag].append(filename)
             else:
-                unmatched[filename] = text
+                # No match found, will be auto-clustered
+                results['unmatched_count'] += 1
+                unmatched_data[filename] = text
         
-        # Cluster unmatched with smart logic
-        if unmatched:
-            clusters = self.smart_cluster_unmatched(unmatched)
+        # Step 2: Auto-cluster unmatched screenshots
+        if unmatched_data:
+            clusters = self.smart_cluster_unmatched(unmatched_data)
             
             for filename, cluster_name in clusters.items():
                 if cluster_name not in results['clustered']:
