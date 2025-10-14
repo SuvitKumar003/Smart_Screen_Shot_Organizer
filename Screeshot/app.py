@@ -391,6 +391,209 @@ if uploaded_files:
                 st.image(img, use_container_width=True)
                 st.caption(file.name[:25])
 
+# Add this section to your app.py after the file uploader section
+
+# Google Drive Integration Section
+st.markdown("---")
+st.markdown("### ☁️ GOOGLE DRIVE INTEGRATION")
+
+if 'gdrive_manager' not in st.session_state:
+    from utils.gdrive_manager import GoogleDriveManager
+    st.session_state.gdrive_manager = GoogleDriveManager()
+
+if 'gdrive_authenticated' not in st.session_state:
+    st.session_state.gdrive_authenticated = False
+
+if 'selected_gdrive_folder' not in st.session_state:
+    st.session_state.selected_gdrive_folder = None
+
+col_gdrive1, col_gdrive2 = st.columns([1, 2])
+
+with col_gdrive1:
+    if not st.session_state.gdrive_authenticated:
+        if st.button("🔗 Connect Google Drive", use_container_width=True, type="primary"):
+            success, result = st.session_state.gdrive_manager.authenticate()
+            
+            if success:
+                st.session_state.gdrive_authenticated = True
+                st.success("✅ Connected to Google Drive!")
+                st.rerun()
+            else:
+                # Show authorization URL
+                st.markdown(f"""
+                <div class="glow-card">
+                    <h4>📝 Authorization Required</h4>
+                    <p>Click the link below to authorize SnapSort AI:</p>
+                    <a href="{result}" target="_blank" style="color: #667eea; font-weight: 700;">
+                        🔐 Authorize Access
+                    </a>
+                    <p style="margin-top: 1rem; font-size: 0.9rem;">
+                        After authorization, paste the redirect URL below:
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                auth_code = st.text_input("Paste authorization URL:", key="auth_url_input")
+                
+                if auth_code and st.button("✅ Complete Authorization"):
+                    if st.session_state.gdrive_manager.complete_authentication(auth_code):
+                        st.session_state.gdrive_authenticated = True
+                        st.success("✅ Successfully connected!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Authorization failed. Please try again.")
+    else:
+        st.markdown("""
+        <div class="success-box">
+            ✅ DRIVE CONNECTED
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🔌 Disconnect", use_container_width=True):
+            st.session_state.gdrive_authenticated = False
+            st.session_state.gdrive_credentials = None
+            st.session_state.selected_gdrive_folder = None
+            st.rerun()
+
+with col_gdrive2:
+    if st.session_state.gdrive_authenticated:
+        st.markdown("#### 📁 Select Folder to Organize")
+        
+        # List folders
+        folders = st.session_state.gdrive_manager.list_folders()
+        
+        if folders:
+            folder_options = {f"{f['name']}": f['id'] for f in folders}
+            folder_options["[Root / My Drive]"] = None
+            
+            selected_folder_name = st.selectbox(
+                "Choose a folder:",
+                options=list(folder_options.keys()),
+                label_visibility="collapsed"
+            )
+            
+            st.session_state.selected_gdrive_folder = folder_options[selected_folder_name]
+            
+            # Show folder stats
+            if st.session_state.selected_gdrive_folder or selected_folder_name == "[Root / My Drive]":
+                folder_id = st.session_state.selected_gdrive_folder
+                images = st.session_state.gdrive_manager.get_images_from_folder(folder_id)
+                
+                st.markdown(f"""
+                <div class="metric-box">
+                    <div class="metric-value">{len(images)}</div>
+                    <div class="metric-label">Images Found</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if len(images) > 0:
+                    col_action1, col_action2 = st.columns(2)
+                    
+                    with col_action1:
+                        action_type = st.radio(
+                            "Organization method:",
+                            ["Move files", "Copy files (keep originals)"],
+                            label_visibility="collapsed"
+                        )
+                        copy_not_move = (action_type == "Copy files (keep originals)")
+                    
+                    with col_action2:
+                        if st.button("🚀 ORGANIZE DRIVE FOLDER", type="primary", use_container_width=True):
+                            if not user_tags:
+                                st.error("⚠️ Please define at least one category first!")
+                            else:
+                                with st.spinner("🤖 Processing Google Drive images..."):
+                                    # Download and process images
+                                    progress_bar = st.progress(0)
+                                    extracted_data = {}
+                                    
+                                    for idx, img_info in enumerate(images):
+                                        # Download image
+                                        image = st.session_state.gdrive_manager.download_image(img_info['id'])
+                                        
+                                        if image:
+                                            # Save to BytesIO for OCR processing
+                                            img_bytes = io.BytesIO()
+                                            image.save(img_bytes, format='PNG')
+                                            img_bytes.seek(0)
+                                            
+                                            # Extract text
+                                            text = st.session_state.ocr_processor.extract_text(img_bytes)
+                                            
+                                            extracted_data[img_info['name']] = {
+                                                'text': text,
+                                                'file': img_bytes,
+                                                'gdrive_id': img_info['id']
+                                            }
+                                        
+                                        progress_bar.progress((idx + 1) / len(images))
+                                    
+                                    # Cluster and organize
+                                    with st.spinner("🧠 Clustering and organizing..."):
+                                        results = st.session_state.clustering_engine.organize_screenshots(
+                                            extracted_data,
+                                            user_tags
+                                        )
+                                        
+                                        # Organize in Google Drive
+                                        org_stats = st.session_state.gdrive_manager.organize_folder_by_categories(
+                                            folder_id,
+                                            results,
+                                            create_subfolders=True,
+                                            copy_not_move=copy_not_move
+                                        )
+                                        
+                                        st.session_state.organized_results = results
+                                        st.session_state.gdrive_org_stats = org_stats
+                                    
+                                    st.success("✅ Google Drive folder organized successfully!")
+                                    st.rerun()
+                    
+                    # Show organization results
+                    if 'gdrive_org_stats' in st.session_state:
+                        st.markdown("#### 📊 Organization Results")
+                        
+                        col_stat1, col_stat2, col_stat3 = st.columns(3)
+                        
+                        with col_stat1:
+                            st.markdown(f"""
+                            <div class="metric-box">
+                                <div class="metric-value" style="color: #10b981;">
+                                    {st.session_state.gdrive_org_stats['total_processed']}
+                                </div>
+                                <div class="metric-label">Files Processed</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with col_stat2:
+                            st.markdown(f"""
+                            <div class="metric-box">
+                                <div class="metric-value" style="color: #667eea;">
+                                    {st.session_state.gdrive_org_stats['successfully_organized']}
+                                </div>
+                                <div class="metric-label">Successfully Organized</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with col_stat3:
+                            st.markdown(f"""
+                            <div class="metric-box">
+                                <div class="metric-value" style="color: #f59e0b;">
+                                    {len(st.session_state.gdrive_org_stats['categories_created'])}
+                                </div>
+                                <div class="metric-label">Folders Created</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        if st.session_state.gdrive_org_stats['categories_created']:
+                            st.markdown("**Created folders:**")
+                            for cat in st.session_state.gdrive_org_stats['categories_created']:
+                                st.markdown(f"📁 {cat}")
+        else:
+            st.info("No folders found in your Google Drive. You can organize from root.")
+    else:
+        st.info("👆 Connect your Google Drive to organize screenshots directly from the cloud!")
+
 # Processing pipeline
 if uploaded_files and user_tags:
     st.markdown("---")
